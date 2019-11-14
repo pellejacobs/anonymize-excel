@@ -10,8 +10,9 @@ export const anonymize = <T>(rows: T[], configs: AnonymizerConfig<T>[]) => {
     data: configs.reduce((acc, { anonymizer, column, memo }) => {
       return acc.map(row => {
         let value
+        const existingValue = row[column]
+        if (existingValue === undefined) return row
         if (memo) {
-          const existingValue = row[column]
           if (memoDict[existingValue] === undefined) {
             memoDict[existingValue] = anonymizer()
           }

@@ -1,4 +1,4 @@
-name: CI Status
+name: CI/CD Status
 on: [push]
 
 jobs:
@@ -16,3 +16,12 @@ jobs:
           npm test
         env:
           CI: true
+      - name: publish
+        if: github.ref == 'refs/heads/master'
+        run: |
+          echo ${{ github.ref }}
+          echo ${{ github }}
+          echo "//registry.npmjs.org/:_authToken=$NPM_PUBLISH_TOKEN" > ~/.npmrc
+          npm publish
+        env:
+          NPM_PUBLISH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
