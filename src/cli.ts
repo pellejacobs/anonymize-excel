@@ -1,12 +1,12 @@
 import faker from 'faker'
 import fuzzy from 'fuzzy'
 import chalk from 'chalk'
+import get from 'lodash/get'
 import fs from 'fs'
 import inquirer from 'inquirer'
 import { anonymize, AnonymizerConfig } from './anonymize'
 import { parseWorkbook, writeWorkbook } from './xlsx'
 inquirer.registerPrompt('checkbox-plus', require('inquirer-checkbox-plus-prompt'))
-inquirer.registerPrompt('list-plus', require('inquirer-autocomplete-prompt'))
 
 if (!process.argv[2]) {
   console.log('Add the filepath to the excel file as a second argument')
@@ -26,31 +26,44 @@ type AnonymizerOption = {
 
 const anonymizerOptions: AnonymizerOption[] = [
   { name: 'Person', fn: () => `${faker.name.firstName()} ${faker.name.lastName()}` },
-  { name: 'Jobtitle', fn: () => faker.name.title() },
   {
     name: 'Amount',
-    args: [{ type: 'number', name: 'max' }, { type: 'number', name: 'min' }],
+    args: [
+      { type: 'number', name: 'max' },
+      { type: 'number', name: 'min' },
+    ],
     fn: ({ min, max }) => Math.round(min * 100 + Math.random() * (max - min) * 100) / 100,
   },
-  { name: 'Department', fn: () => faker.commerce.department() },
   { name: 'Abbreviation', fn: () => faker.random.alphaNumeric(3).toUpperCase() },
 ]
 
 const getAnonymizer = async (column): Promise<AnonymizerConfig<any>> => {
   const { name } = await inquirer.prompt({
-    type: 'list-plus' as 'list',
+    type: 'list',
     name: 'name',
     message: `Which anonymizer to use for ${chalk.green(column)}`,
-    ...{
-      source: async (_, input) =>
-        fuzzy.filter(input || '', anonymizerOptions.map(a => a.name)).map(c => c.original),
-    },
+    choices: [...anonymizerOptions.map(a => a.name), 'Manual (custom faker function)'],
   })
   let args = {}
-  const option = anonymizerOptions.find(option => option.name === name)
+  let option
+  if (name === 'Manual (custom faker function)') {
+    const { fnPath } = await inquirer.prompt({
+      type: 'input',
+      name: 'fnPath',
+      message: 'Custom faker.js path. Eg. "commerce.productName"',
+      validate: input => {
+        if (!get(faker, input)) return `${input} is not a valid faker function`
+        return true
+      },
+    })
+    option = { fn: () => get(faker, fnPath)() }
+  } else {
+    option = anonymizerOptions.find(option => option.name === name)
+  }
   if (option.args) {
     args = await inquirer.prompt(option.args)
   }
+
   const { memo } = await inquirer.prompt({
     type: 'confirm',
     name: 'memo',
